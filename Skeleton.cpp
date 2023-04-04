@@ -11,8 +11,13 @@
 #include <cmath>
 using namespace chrono;
 
+// collision::ChCollisionSystemType collision_type = collision::ChCollisionSystemType::BULLET;
+
+collision::ChCollisionSystemType collision_type = collision::ChCollisionSystemType::CHRONO;
+
 std::shared_ptr<ChMaterialSurface> DefaultContactMaterial(ChContactMethod contact_method) {
     float mu = 0.37f;   // coefficient of friction
+
     float cr = 0.9f;   // coefficient of restitution
     float Y = 2e7f;    // Young's modulus
     float nu = 0.3f;   // Poisson ratio
@@ -43,7 +48,7 @@ std::shared_ptr<ChMaterialSurface> DefaultContactMaterial(ChContactMethod contac
 class ChFunction_LeftMotor : public ChFunction {
     public:
    // ChFunction_LeftMotor() : m_speed(CH_C_1_PI/0.4f) {}
-       ChFunction_LeftMotor() : m_speed(CH_C_1_PI/4.0f){}  // speed 10 T
+       ChFunction_LeftMotor() : m_speed(CH_C_1_PI/4.0f){}
 
     ChFunction_LeftMotor(double speed): m_speed(speed){}
 
@@ -54,7 +59,7 @@ class ChFunction_LeftMotor : public ChFunction {
     virtual double Get_y(double x) const override { 
 
        // int g = int((x+0.2f)/0.4f) % 4;
-        int g = int(x / 4.0f) % 4;            // speed 10 T
+        int g = int(x / 4.0f) % 4;
         double velo;
         switch (g) {
             case 0:
@@ -76,7 +81,7 @@ class ChFunction_LeftMotor : public ChFunction {
 class ChFunction_RightMotor : public ChFunction {
     public:
     //ChFunction_RightMotor() : m_speed(CH_C_1_PI/0.4f) {}
-    ChFunction_RightMotor() : m_speed(CH_C_1_PI/4.0f){}        // speed 10 T
+    ChFunction_RightMotor() : m_speed(CH_C_1_PI/4.0f){}
 
     ChFunction_RightMotor(double speed): m_speed(speed){}
 
@@ -86,7 +91,7 @@ class ChFunction_RightMotor : public ChFunction {
     virtual double Get_y(double x) const override { 
 
        // int g = int(x/0.4f) % 4;
-        int g = int(x / 4.0f) % 4;                        // speed 10 T
+        int g = int(x / 4.0f) % 4;
         double velo;
         switch (g) {
             case 0:
@@ -128,6 +133,7 @@ class Skeleton{
 
         void Initialize(){
 
+
             double mass_small = 0.003186;
             double mass_large = 0.0248;
             ChVector<double> arm_size(0.05, 0.023, 0.003);
@@ -145,11 +151,6 @@ class Skeleton{
             // rotate angle of theta+alpha_1 with respect to y axis
             ChQuaternion<double> arm1_rot(Q_from_AngAxis(m_left_angle + m_belly_rotation, VECT_Y));
 
-
-            std::shared_ptr<collision::ChCollisionModel> collision_model =
-                            chrono_types::make_shared<collision::ChCollisionModelBullet>();
-
-
             // -----------------------------------------------------
             // left arm
             // -----------------------------------------------------
@@ -157,45 +158,37 @@ class Skeleton{
                                                                 arm_size.y(), 
                                                                 arm_size.z(),  // x,y,z size
                                                                 100,        // density
-                                                                true,       // visualization?
-                                                                true,
                                                                 link_mat,
-                                                                collision_model);     // collision?
+                                                                collision_type);     // collision?
             left_arm->SetPos(arm1_pos + m_skeleton_center);
             left_arm->SetRot(arm1_rot);
             left_arm->SetBodyFixed(false);
+            left_arm->SetCollide(true);
             left_arm->GetCollisionModel()->SetFamilyMaskNoCollisionWithFamily(no_contact_family_id);
-            left_arm->SetNameString(m_skeleton_name + " left_arm"); // Add Name
-            
-            
-
-            auto texture = chrono_types::make_shared<ChTexture>();
-            texture->SetTextureFilename(GetChronoDataFile("textures/cubetexture_bluewhite.png"));
-            left_arm->AddAsset(texture);
-
+            left_arm->SetNameString(m_skeleton_name + " link1");
 
             // -----------------------------------------------------
             // center belly
             // -----------------------------------------------------
             ChQuaternion<double> center_body_rotation = Q_from_AngAxis(m_belly_rotation, VECT_Y);
             std::shared_ptr<collision::ChCollisionModel> collision_model2 =
-                            chrono_types::make_shared<collision::ChCollisionModelBullet>();
+                            chrono_types::make_shared<collision::ChCollisionModelChrono>();
 
             center_body = chrono_types::make_shared<ChBodyEasyBox>(belly_size.x(), 
                                                                   belly_size.y(), 
                                                                   belly_size.z(),  // x,y,z size
                                                                   100,        // density
-                                                                  true,       // visualization?
-                                                                  true,
                                                                   link_mat,
-                                                                  collision_model2);     // collision?
+                                                                  collision_type);     // collision?
             center_body->SetPos(m_skeleton_center);
             center_body->SetRot(center_body_rotation);
             center_body->SetBodyFixed(false);
             center_body->SetMass(mass_large);
+            center_body->SetCollide(true);
             center_body->GetCollisionModel()->SetFamily(no_contact_family_id);
-            center_body->AddAsset(texture);
-            center_body->SetNameString(m_skeleton_name + " center_body");
+            center_body->SetNameString(m_skeleton_name + " link2");
+
+
 
             // -----------------------------------------------------
             // Create a motor between left arm and center body
@@ -204,7 +197,7 @@ class Skeleton{
             left_motor->Initialize(left_arm, center_body, ChFrame<>(left_motor_pos + m_skeleton_center, Q_from_AngAxis(CH_C_PI_2, VECT_X)));
             // initialize motor velocity function, speed of pi/4
             //auto left_motor_velo_func = chrono_types::make_shared<ChFunction_LeftMotor>(CH_C_PI/0.4f);
-            auto left_motor_velo_func = chrono_types::make_shared<ChFunction_LeftMotor>(CH_C_PI / 4.0f);   // Speed 10 T
+            auto left_motor_velo_func = chrono_types::make_shared<ChFunction_LeftMotor>(CH_C_PI / 4.0f);
             left_motor->SetSpeedFunction(left_motor_velo_func);
 
 
@@ -212,7 +205,7 @@ class Skeleton{
             ChQuaternion<double> arm2_rot(Q_from_AngAxis(m_right_angle + m_belly_rotation, VECT_Y));
 
             std::shared_ptr<collision::ChCollisionModel> collision_model3 =
-                            chrono_types::make_shared<collision::ChCollisionModelBullet>();
+                            chrono_types::make_shared<collision::ChCollisionModelChrono>();
 
             // -----------------------------------------------------
             // right arm
@@ -221,18 +214,15 @@ class Skeleton{
                                                                 arm_size.y(), 
                                                                 arm_size.z(),  // x,y,z size
                                                                 100,        // density
-                                                                true,       // visualization?
-                                                                true,
                                                                 link_mat,
-                                                                collision_model3);     // collision?
+                                                                collision_type);     // collision?
             right_arm->SetPos(arm2_pos + m_skeleton_center);
             right_arm->SetRot(arm2_rot);
             right_arm->SetBodyFixed(false);  // the truss does not move!
             right_arm->SetMass(mass_small);
+            right_arm->SetCollide(true);
             right_arm->GetCollisionModel()->SetFamilyMaskNoCollisionWithFamily(no_contact_family_id);
-            right_arm->AddAsset(texture);
-            right_arm->SetNameString(m_skeleton_name + " right_arm");
-
+            right_arm->SetNameString(m_skeleton_name + " link3");
 
             // -----------------------------------------------------
             // Create a motor between right arm and center body
@@ -241,7 +231,7 @@ class Skeleton{
             right_motor->Initialize(right_arm, center_body, ChFrame<>(right_motor_pos + m_skeleton_center, Q_from_AngAxis(-CH_C_PI_2, VECT_X)));
 
            // auto right_motor_velo_func = chrono_types::make_shared<ChFunction_RightMotor>(CH_C_PI/0.4f);
-            auto right_motor_velo_func = chrono_types::make_shared<ChFunction_RightMotor>(CH_C_PI / 4.0f);  // Speed 10 T
+            auto right_motor_velo_func = chrono_types::make_shared<ChFunction_RightMotor>(CH_C_PI / 4.0f);
             right_motor->SetSpeedFunction(right_motor_velo_func);
 
         };
@@ -250,7 +240,7 @@ class Skeleton{
             sys->AddBody(left_arm);
             sys->AddBody(center_body);
             sys->AddBody(right_arm);
-            
+
             sys->AddLink(left_motor);            
             sys->AddLink(right_motor);
 
@@ -260,10 +250,8 @@ class Skeleton{
             m_contact_method = contact_method;
         }
 
-        void SetSkeletonName(std::string name) {
-
+        void SetSkeletonName(std::string name){
             m_skeleton_name = name;
-
         }
 
         ChVector<double> GetPos(){
@@ -291,6 +279,10 @@ class Skeleton{
             return theta;
         }
 
+        std::shared_ptr<ChBodyEasyBox> GetLeftArm(){return left_arm;};
+        std::shared_ptr<ChBodyEasyBox> GetRightArm(){return right_arm;};
+        std::shared_ptr<ChBodyEasyBox> GetBelly(){return center_body;};
+        
 
     private:
         ChVector<double> m_skeleton_center;
@@ -298,12 +290,12 @@ class Skeleton{
         double m_left_angle;
         double m_right_angle;
         int no_contact_family_id;
+        std::string m_skeleton_name; // skeleton name
         std::shared_ptr<ChBodyEasyBox> left_arm;
         std::shared_ptr<ChBodyEasyBox> center_body;
         std::shared_ptr<ChBodyEasyBox> right_arm;
         std::shared_ptr<ChLinkMotorRotationSpeed> left_motor;
         std::shared_ptr<ChLinkMotorRotationSpeed> right_motor;
-        std::string m_skeleton_name;
         ChContactMethod m_contact_method;
 
 };
